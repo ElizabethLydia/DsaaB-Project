@@ -1,11 +1,13 @@
 # 团队日志
+
+---
 ### 2025.4.10 fjy
 
-搭建了github库，方便大家连接
+establish the project and the basic structure of the code.
 
 ### 2025.4.16 fjy
 
-添加了一些课程文件和pdf
+add some course files and pdf
 
 ### 2025.4.16 fjy
 
@@ -16,6 +18,7 @@ The first step:
 2.calculate the Ix, Iy, G and normalize the f_G
 
 3.build Graph and calculate the cost
+
 ---
 ### 2025.4.17 fjy
 
