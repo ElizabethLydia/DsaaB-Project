@@ -19,3 +19,10 @@ The second step:
 a.figure the compressed problem
 b.understand the code
 c.make it can continuously select the borders.//
+
+### 2025.4.17 fjy
+I'm completed drop a file into the application and worked out the code to continuously select the borders.
+To do:
+a.when run the application, it shows that "please drop a ...."
+b.compressed problem
+c.make the application stick on the top to operate.
