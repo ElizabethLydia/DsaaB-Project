@@ -4,9 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.PriorityQueue;
 
-// 节点类，表示图像中的一个像素
 class Node {
     int x, y; // 像素坐标
     double f_G; // 归一化梯度值
@@ -20,7 +21,6 @@ class Node {
     }
 }
 
-// 链接类，表示两个节点之间的连接
 class Link {
     Node target; // 目标节点
     double cost; // 链接成本 C(x, y)
@@ -31,8 +31,7 @@ class Link {
     }
 }
 
-public class IntelligentScissorsPart1{
-    // Sobel算子
+public class IntelligentScissorsPart1 {
     private static final int[][] SX = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     private static final int[][] SY = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
 
@@ -42,7 +41,6 @@ public class IntelligentScissorsPart1{
     private double[][] Ix, Iy, G, f_G; // 梯度值
     private Node[][] graph; // 图结构
 
-    // 构造函数：读取图像
     public IntelligentScissorsPart1(String imagePath) throws IOException {
         this.image = ImageIO.read(new File(imagePath));
         this.width = image.getWidth();
@@ -56,12 +54,10 @@ public class IntelligentScissorsPart1{
         loadPixels();
     }
 
-    // 步骤1：读取图像像素值（灰度）
     private void loadPixels() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int rgb = image.getRGB(x, y);
-                // 转换为灰度值：0.299R + 0.587G + 0.114B
                 int r = (rgb >> 16) & 0xFF;
                 int g = (rgb >> 8) & 0xFF;
                 int b = rgb & 0xFF;
@@ -70,11 +66,9 @@ public class IntelligentScissorsPart1{
         }
     }
 
-    // 步骤2：计算梯度 Ix 和 Iy
     private void computeGradients() {
         for (int y = 1; y < height - 1; y++) {
             for (int x = 1; x < width - 1; x++) {
-                // 应用 Sx 核（水平梯度）
                 double sumX = 0;
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dx = -1; dx <= 1; dx++) {
@@ -83,7 +77,6 @@ public class IntelligentScissorsPart1{
                 }
                 Ix[y][x] = sumX;
 
-                // 应用 Sy 核（垂直梯度）
                 double sumY = 0;
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dx = -1; dx <= 1; dx++) {
@@ -93,7 +86,6 @@ public class IntelligentScissorsPart1{
                 Iy[y][x] = sumY;
             }
         }
-        // 边界像素梯度设为0（简化处理）
         for (int x = 0; x < width; x++) {
             Ix[0][x] = Ix[height - 1][x] = 0;
             Iy[0][x] = Iy[height - 1][x] = 0;
@@ -104,10 +96,8 @@ public class IntelligentScissorsPart1{
         }
     }
 
-    // 步骤3：计算梯度幅度 G 和归一化 f_G
     private void computeGradientMagnitude() {
         double G_max = 0;
-        // 计算 G = sqrt(Ix^2 + Iy^2)
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 G[y][x] = Math.sqrt(Ix[y][x] * Ix[y][x] + Iy[y][x] * Iy[y][x]);
@@ -116,7 +106,6 @@ public class IntelligentScissorsPart1{
                 }
             }
         }
-        // 归一化 f_G = (G_max - G) / G_max
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 f_G[y][x] = G_max == 0 ? 0 : (G_max - G[y][x]) / G_max;
@@ -124,9 +113,7 @@ public class IntelligentScissorsPart1{
         }
     }
 
-    // 步骤4：构建图结构，计算链接成本
     private void buildGraph() {
-        // 初始化节点
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 graph[y][x] = new Node(x, y, f_G[y][x]);
@@ -142,7 +129,6 @@ public class IntelligentScissorsPart1{
                     int nx = x + dx[i];
                     int ny = y + dy[i];
                     if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        // 计算链接成本 C(x, y) = 1 / (1 + G)
                         double avg_G = (G[y][x] + G[ny][nx]) / 2;
                         double cost = 1.0 / (1.0 + avg_G);
                         node.neighbors.add(new Link(graph[ny][nx], cost));
@@ -152,19 +138,62 @@ public class IntelligentScissorsPart1{
         }
     }
 
-    // 保存数据到CSV文件
+    public List<Node> computeShortestPath(int seedX, int seedY, int targetX, int targetY) {
+        if (seedX < 0 || seedX >= width || seedY < 0 || seedY >= height ||
+                targetX < 0 || targetX >= width || targetY < 0 || targetY >= height) {
+            return new ArrayList<>();
+        }
+        double[][] dist = new double[height][width];
+        Node[][] prev = new Node[height][width];
+        boolean[][] visited = new boolean[height][width];
+        PriorityQueue<Node> queue = new PriorityQueue<>((a, b) ->
+                Double.compare(dist[a.y][a.x], dist[b.y][b.x]));
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                dist[y][x] = Double.POSITIVE_INFINITY;
+            }
+        }
+        dist[seedY][seedX] = 0;
+        queue.offer(graph[seedY][seedX]);
+        while (!queue.isEmpty()) {
+            Node current = queue.poll();
+            int x = current.x;
+            int y = current.y;
+            if (visited[y][x]) continue;
+            visited[y][x] = true;
+            if (x == targetX && y == targetY) break;
+            for (Link link : current.neighbors) {
+                Node neighbor = link.target;
+                int nx = neighbor.x;
+                int ny = neighbor.y;
+                double newDist = dist[y][x] + link.cost;
+                if (newDist < dist[ny][nx]) {
+                    dist[ny][nx] = newDist;
+                    prev[ny][nx] = current;
+                    queue.offer(neighbor);
+                }
+            }
+        }
+        List<Node> path = new ArrayList<>();
+        Node current = graph[targetY][targetX];
+        while (current != null && (current.x != seedX || current.y != seedY)) {
+            path.add(current);
+            current = prev[current.y][current.x];
+        }
+        if (current != null) {
+            path.add(graph[seedY][seedX]);
+        }
+        Collections.reverse(path);
+        return path;
+    }
+
     private void saveToCSV(String outputDir) throws IOException {
-        // 创建输出目录
         File dir = new File(outputDir);
         if (!dir.exists()) {
             dir.mkdirs();
         }
-
-        // 定义文件名和数据
         String[] fileNames = {"pixels.csv", "Ix.csv", "Iy.csv", "G.csv", "f_G.csv"};
         double[][][] data = {toDoubleArray(pixels), Ix, Iy, G, f_G};
-
-        // 保存每个数据集到CSV
         for (int s = 0; s < fileNames.length; s++) {
             try (PrintWriter writer = new PrintWriter(new File(outputDir + "/" + fileNames[s]))) {
                 for (int y = 0; y < height; y++) {
@@ -180,7 +209,6 @@ public class IntelligentScissorsPart1{
         }
     }
 
-    // 将int[][]转换为double[][]以统一处理
     private double[][] toDoubleArray(int[][] array) {
         double[][] result = new double[height][width];
         for (int y = 0; y < height; y++) {
@@ -191,7 +219,6 @@ public class IntelligentScissorsPart1{
         return result;
     }
 
-    // 执行所有步骤
     public void process() throws IOException {
         computeGradients();
         computeGradientMagnitude();
@@ -199,20 +226,116 @@ public class IntelligentScissorsPart1{
         saveToCSV("output");
     }
 
-    // 获取图结构（供后续使用）
     public Node[][] getGraph() {
         return graph;
     }
 
-    // 主函数：测试代码
+    // 新增：获取梯度幅度G
+    public double[][] getG() {
+        return G;
+    }
+
+    // 新增：获取归一化梯度f_G
+    public double[][] getFG() {
+        return f_G;
+    }
+
+    // 新增：获取灰度像素值
+    public int[][] getPixels() {
+        return pixels;
+    }
+
+    // 新增：生成梯度图像（热力图）
+    public BufferedImage getGradientImage() {
+        BufferedImage gradientImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        double maxG = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (G[y][x] > maxG) {
+                    maxG = G[y][x];
+                }
+            }
+        }
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int value = maxG == 0 ? 0 : (int) (G[y][x] * 255 / maxG);
+                int rgb = (value << 16) | (value << 8) | value; // 灰度
+                gradientImage.setRGB(x, y, rgb);
+            }
+        }
+        return gradientImage;
+    }
+
+    // 新增：生成灰度图像
+    public BufferedImage getGrayImage() {
+        BufferedImage grayImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int value = pixels[y][x];
+                int rgb = (value << 16) | (value << 8) | value;
+                grayImage.setRGB(x, y, rgb);
+            }
+        }
+        return grayImage;
+    }
+
     public static void main(String[] args) {
         try {
-            // 替换为你的图像路径
             IntelligentScissorsPart1 processor = new IntelligentScissorsPart1("sample.png");
             processor.process();
-            System.out.println("Data saved to output directory (pixels.csv, Ix.csv, Iy.csv, G.csv, f_G.csv)");
+            int seedX = 10, seedY = 10;
+            int targetX = 20, targetY = 20;
+            List<Node> path = processor.computeShortestPath(seedX, seedY, targetX, targetY);
+            System.out.println("Shortest Path from (" + seedX + ", " + seedY + ") to (" + targetX + ", " + targetY + "):");
+            if (path.isEmpty()) {
+                System.out.println("No path found!");
+            } else {
+                for (Node node : path) {
+                    System.out.println("(" + node.x + ", " + node.y + ")");
+                }
+                System.out.println("Path length: " + path.size() + " nodes");
+            }
         } catch (IOException e) {
             System.err.println("Error: " + e.getMessage());
         }
     }
 }
+
+//    // 主函数：测试代码
+//    public static void main(String[] args) {
+//        try {
+//            // 替换为你的图像路径
+//            IntelligentScissorsPart1 processor = new IntelligentScissorsPart1("sample.png");
+//            processor.process();
+//            System.out.println("Data saved to output directory (pixels.csv, Ix.csv, Iy.csv, G.csv, f_G.csv)");
+//        } catch (IOException e) {
+//            System.err.println("Error: " + e.getMessage());
+//        }
+//    }
+//}
+
+//    public static void main(String[] args) {
+//        try {
+//            // 替换为你的图像路径
+//            IntelligentScissorsPart1 processor = new IntelligentScissorsPart1("sample.png");
+//            processor.process();
+//
+//            // 测试Dijkstra算法
+//            int seedX = 10, seedY = 10; // 种子点坐标
+//            int targetX = 20, targetY = 20; // 目标点坐标
+//            List<Node> path = processor.computeShortestPath(seedX, seedY, targetX, targetY);
+//
+//            // 打印路径
+//            System.out.println("Shortest Path from (" + seedX + ", " + seedY + ") to (" + targetX + ", " + targetY + "):");
+//            if (path.isEmpty()) {
+//                System.out.println("No path found!");
+//            } else {
+//                for (Node node : path) {
+//                    System.out.println("(" + node.x + ", " + node.y + ")");
+//                }
+//                System.out.println("Path length: " + path.size() + " nodes");
+//            }
+//        } catch (IOException e) {
+//            System.err.println("Error: " + e.getMessage());
+//        }
+//    }
