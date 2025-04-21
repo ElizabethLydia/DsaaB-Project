@@ -47,3 +47,9 @@ a.when run the application, it shows that "please drop a ...."
 b.compressed problem
 
 c.make the application stick on the top to operate.
+
+### 2025.4.21 zyt
+
+try to solve the problem of scaled image.--GUI2
+
+(separate processing of two types of image) 
