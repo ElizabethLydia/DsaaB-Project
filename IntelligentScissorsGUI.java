@@ -226,6 +226,14 @@ public class IntelligentScissorsGUI extends JFrame {
 
         setSize(800, 600);
         setLocationRelativeTo(null);
+
+        // 👇 添加这个监听器
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                updateImageDisplay();
+            }
+        });
     }
 
     private void loadImage() {
@@ -260,13 +268,17 @@ public class IntelligentScissorsGUI extends JFrame {
             int maxHeight = getHeight() - 100; // 留工具栏和边距
             double scale = Math.min((double) maxWidth / displayImage.getWidth(),
                     (double) maxHeight / displayImage.getHeight());
-            scaleX = scale;
-            scaleY = scale;
+//            scaleX = scale;
+//            scaleY = scale;
             int scaledWidth = (int) (displayImage.getWidth() * scale);
             int scaledHeight = (int) (displayImage.getHeight() * scale);
             Image scaled = displayImage.getScaledInstance(scaledWidth, scaledHeight, Image.SCALE_SMOOTH);
             imageLabel.setIcon(new ImageIcon(scaled));
             imageLabel.setPreferredSize(new Dimension(scaledWidth, scaledHeight));
+
+            // ✅ 更新缩放比例：确保 scaleX/scaleY 是**实际显示出来的比例**
+            scaleX = (double) scaledWidth / originalImage.getWidth();
+            scaleY = (double) scaledHeight / originalImage.getHeight();
         } else {
             // 原始尺寸
             scaleX = 1.0;
@@ -290,3 +302,4 @@ public class IntelligentScissorsGUI extends JFrame {
         });
     }
 }
+

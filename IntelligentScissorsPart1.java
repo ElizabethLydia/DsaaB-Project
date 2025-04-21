@@ -54,6 +54,19 @@ public class IntelligentScissorsPart1 {
         loadPixels();
     }
 
+    public IntelligentScissorsPart1(BufferedImage image) { //从 GUI 中传入已缩放或原始图像
+        this.image = image;
+        this.width = image.getWidth();
+        this.height = image.getHeight();
+        this.pixels = new int[height][width];
+        this.Ix = new double[height][width];
+        this.Iy = new double[height][width];
+        this.G = new double[height][width];
+        this.f_G = new double[height][width];
+        this.graph = new Node[height][width];
+        loadPixels();
+    }
+
     private void loadPixels() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
