@@ -4,6 +4,8 @@ import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.*;
 import java.awt.event.*;
+import java.awt.geom.Area;
+import java.awt.geom.GeneralPath;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +23,7 @@ public class IntelligentScissorsGUI extends JFrame {
     private boolean showGradient = false;
     private boolean fitWindow = true; // 默认适应窗口
     private double scaleX = 1.0, scaleY = 1.0; // 缩放比例
+    private boolean isDragging = true; // 控制鼠标移动事件的标志
 
     public IntelligentScissorsGUI() {
         setTitle("Intelligent Scissors");
@@ -119,47 +122,82 @@ public class IntelligentScissorsGUI extends JFrame {
             updateImageDisplay();
         });
         toolbar.add(originalSizeButton);
-        JButton closePathButton = new JButton("Close Path");
-        closePathButton.addActionListener(e -> {
-            if (processor != null && seedNodes.size() >= 2) {
-                // 连接首尾种子点
-                Node first = seedNodes.get(0);
-                Node last = seedNodes.get(seedNodes.size() - 1);
-                List<Node> closingPath = processor.computeShortestPath(last.x, last.y, first.x, first.y);
-                if (!closingPath.isEmpty()) {
-                    paths.add(closingPath);
-                    imageLabel.repaint();
-                }
-            }
-        });
-        toolbar.add(closePathButton);
+//        JButton closePathButton = new JButton("Close Path");
+//        closePathButton.addActionListener(e -> {
+//            if (processor != null && seedNodes.size() >= 2) {
+//                // 连接首尾种子点
+//                Node first = seedNodes.get(0);
+//                Node last = seedNodes.get(seedNodes.size() - 1);
+//                List<Node> closingPath = processor.computeShortestPath(last.x, last.y, first.x, first.y);
+//                if (!closingPath.isEmpty()) {
+//                    paths.add(closingPath);
+//                    imageLabel.repaint();
+//                }
+//            }
+//        });
+//        toolbar.add(closePathButton);
         JButton saveButton = new JButton("Save Path");
         saveButton.addActionListener(e -> {
             if (!paths.isEmpty()) {
-                BufferedImage output = new BufferedImage(originalImage.getWidth(), originalImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+                int width = originalImage.getWidth();
+                int height = originalImage.getHeight();
+                BufferedImage output = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
                 Graphics2D g2d = output.createGraphics();
-                g2d.drawImage(originalImage, 0, 0, null);
-                g2d.setColor(Color.RED);
-                g2d.setStroke(new BasicStroke(2));
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+
+                // 填充整个图像为黑色
+                g2d.setColor(Color.BLACK);
+                g2d.fillRect(0, 0, width, height);
+
+                // 创建一个闭合路径
+                GeneralPath combinedPath = new GeneralPath();
+                boolean started = false;
                 for (List<Node> path : paths) {
                     if (path != null && !path.isEmpty()) {
+                        if (!started) {
+                            combinedPath.moveTo(path.get(0).x, path.get(0).y);
+                            started = true;
+                        }
                         for (int i = 1; i < path.size(); i++) {
-                            Node n1 = path.get(i - 1);
-                            Node n2 = path.get(i);
-                            g2d.drawLine(n1.x, n1.y, n2.x, n2.y);
+                            Node node = path.get(i);
+                            combinedPath.lineTo(node.x, node.y);
                         }
                     }
                 }
+                combinedPath.closePath(); // 确保路径闭合
+
+                // 创建剪裁区域
+                Area clipArea = new Area(combinedPath);
+
+                // 设置剪裁区域并绘制原始图像
+                g2d.setClip(clipArea);
+                g2d.drawImage(originalImage, 0, 0, null);
+                g2d.setClip(null); // 恢复默认剪裁区域
+
+//                // 绘制红色路径线条（包括闭合线段）
+//                g2d.setColor(Color.RED);
+//                g2d.setStroke(new BasicStroke(2));
+//                g2d.draw(combinedPath);
+
                 g2d.dispose();
+                // 文件路径
+                File outputFile = new File("output.png");
+
+                // 如果文件存在，则删除
+                if (outputFile.exists()) {
+                    outputFile.delete();
+                }
+
                 try {
-                    ImageIO.write(output, "png", new File("path_output.png"));
-                    JOptionPane.showMessageDialog(this, "Path saved to path_output.png");
+                    ImageIO.write(output, "png", outputFile);
+                    JOptionPane.showMessageDialog(this, "Path saved to output.png");
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(this, "Error saving image: " + ex.getMessage());
                 }
             }
         });
-        toolbar.add(saveButton);
+//        toolbar.add(saveButton);
         add(toolbar, BorderLayout.NORTH);
 
         // 鼠标事件
@@ -171,30 +209,50 @@ public class IntelligentScissorsGUI extends JFrame {
                         seedNodes.clear();
                         paths.clear();
                         imageLabel.repaint();
-                    } else if (e.getButton() == MouseEvent.BUTTON1) { // 左键添加种子点
+                    } else if (e.getButton() == MouseEvent.BUTTON1) {// 左键添加种子点
                         int x = (int) (e.getX() / scaleX); // 转换为原始坐标
                         int y = (int) (e.getY() / scaleY);
                         if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
                             Node newSeed = processor.getGraph()[y][x];
                             seedNodes.add(newSeed);
-                            // 如果不是第一个种子点，计算路径
-                            if (seedNodes.size() >= 2) {
-                                Node prevSeed = seedNodes.get(seedNodes.size() - 2);
-                                List<Node> path = processor.computeShortestPath(prevSeed.x, prevSeed.y, newSeed.x, newSeed.y);
-                                if (!path.isEmpty()) {
-                                    paths.add(path);
+                            if (e.getClickCount() >= 2){ //双击
+//                                Node seed = seedNodes.get(0);
+//                                List<Node> path = processor.computeShortestPath(seed.x, seed.y, newSeed.x, newSeed.y);
+//                                if (!path.isEmpty()) {
+//                                    paths.add(path);
+//                                }
+                                if (!seedNodes.isEmpty()) {
+                                    Node first = seedNodes.get(0);
+                                    Node last = seedNodes.get(seedNodes.size() - 1);
+                                    List<Node> closingPath = new ArrayList<>();
+                                    closingPath.add(first);
+                                    closingPath.add(last);
+                                    paths.add(closingPath);
+                                    imageLabel.repaint();
+                                    isDragging = false;
                                 }
+                                saveButton.doClick();
+                            }else {
+                                // 如果不是第一个种子点，计算路径
+                                if (seedNodes.size() >= 2) {
+                                    Node prevSeed = seedNodes.get(seedNodes.size() - 2);
+                                    List<Node> path = processor.computeShortestPath(prevSeed.x, prevSeed.y, newSeed.x, newSeed.y);
+                                    if (!path.isEmpty()) {
+                                        paths.add(path);
+                                    }
+                                }
+                                imageLabel.repaint();
                             }
-                            imageLabel.repaint();
                         }
                     }
                 }
             }
+
         });
         imageLabel.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                if (processor != null && originalImage != null && !seedNodes.isEmpty()) {
+                if (processor != null && originalImage != null && !seedNodes.isEmpty() && isDragging) {
                     int x = (int) (e.getX() / scaleX); // 转换为原始坐标
                     int y = (int) (e.getY() / scaleY);
                     if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
@@ -264,8 +322,8 @@ public class IntelligentScissorsGUI extends JFrame {
         BufferedImage displayImage = showGradient ? gradientImage : originalImage;
         if (fitWindow) {
             // 计算缩放比例
-            int maxWidth = getWidth() - 50; // 留边距
-            int maxHeight = getHeight() - 100; // 留工具栏和边距
+            int maxWidth = getWidth();
+            int maxHeight = getHeight();
             double scale = Math.min((double) maxWidth / displayImage.getWidth(),
                     (double) maxHeight / displayImage.getHeight());
 //            scaleX = scale;
@@ -295,6 +353,7 @@ public class IntelligentScissorsGUI extends JFrame {
         super.setSize(width, height);
         updateImageDisplay();
     }
+
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {

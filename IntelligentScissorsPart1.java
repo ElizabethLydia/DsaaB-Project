@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import edu.princeton.cs.algs4.IndexMinPQ;
+import edu.princeton.cs.algs4.Stack;
 
 class Node {
     int x, y; // 像素坐标
@@ -142,8 +144,11 @@ public class IntelligentScissorsPart1 {
                     int nx = x + dx[i];
                     int ny = y + dy[i];
                     if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        double avg_G = (G[y][x] + G[ny][nx]) / 2;
-                        double cost = 1.0 / (1.0 + avg_G);
+                        boolean isDiag = dx[i] != 0 && dy[i] != 0;
+                        double basecost = 1.0 / (1.0 + G[ny][nx]);
+                        double cost = isDiag ? basecost * Math.sqrt(2) : basecost; //对角线乘根号2
+//                        double avg_G = (G[y][x] + G[ny][nx]) / 2;
+//                        double cost = 1.0 / (1.0 + avg_G);
                         node.neighbors.add(new Link(graph[ny][nx], cost));
                     }
                 }
@@ -152,52 +157,75 @@ public class IntelligentScissorsPart1 {
     }
 
     public List<Node> computeShortestPath(int seedX, int seedY, int targetX, int targetY) {
+        // Boundary check
         if (seedX < 0 || seedX >= width || seedY < 0 || seedY >= height ||
                 targetX < 0 || targetX >= width || targetY < 0 || targetY >= height) {
             return new ArrayList<>();
         }
-        double[][] dist = new double[height][width];
-        Node[][] prev = new Node[height][width];
-        boolean[][] visited = new boolean[height][width];
-        PriorityQueue<Node> queue = new PriorityQueue<>((a, b) ->
-                Double.compare(dist[a.y][a.x], dist[b.y][b.x]));
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                dist[y][x] = Double.POSITIVE_INFINITY;
-            }
+
+        // Convert 2D coordinates to 1D index for algs4 data structures
+        int V = width * height;
+        double[] distTo = new double[V];
+        Node[] edgeTo = new Node[V];
+        IndexMinPQ<Double> pq = new IndexMinPQ<>(V);
+
+        // Initialize distances to infinity
+        for (int v = 0; v < V; v++) {
+            distTo[v] = Double.POSITIVE_INFINITY;
         }
-        dist[seedY][seedX] = 0;
-        queue.offer(graph[seedY][seedX]);
-        while (!queue.isEmpty()) {
-            Node current = queue.poll();
-            int x = current.x;
-            int y = current.y;
-            if (visited[y][x]) continue;
-            visited[y][x] = true;
+
+        // Convert seed coordinates to 1D index
+        int seedIndex = seedY * width + seedX;
+        distTo[seedIndex] = 0.0;
+        pq.insert(seedIndex, 0.0);
+
+        while (!pq.isEmpty()) {
+            int currentIndex = pq.delMin();
+            int x = currentIndex % width;
+            int y = currentIndex / width;
+
+            // Early termination if target is reached
             if (x == targetX && y == targetY) break;
-            for (Link link : current.neighbors) {
+
+            for (Link link : graph[y][x].neighbors) {
                 Node neighbor = link.target;
-                int nx = neighbor.x;
-                int ny = neighbor.y;
-                double newDist = dist[y][x] + link.cost;
-                if (newDist < dist[ny][nx]) {
-                    dist[ny][nx] = newDist;
-                    prev[ny][nx] = current;
-                    queue.offer(neighbor);
+                int neighborIndex = neighbor.y * width + neighbor.x;
+
+                double newDist = distTo[currentIndex] + link.cost;
+                if (newDist < distTo[neighborIndex]) {
+                    distTo[neighborIndex] = newDist;
+                    edgeTo[neighborIndex] = graph[y][x];
+
+                    if (pq.contains(neighborIndex)) {
+                        pq.decreaseKey(neighborIndex, distTo[neighborIndex]);
+                    } else {
+                        pq.insert(neighborIndex, distTo[neighborIndex]);
+                    }
                 }
             }
         }
-        List<Node> path = new ArrayList<>();
-        Node current = graph[targetY][targetX];
-        while (current != null && (current.x != seedX || current.y != seedY)) {
-            path.add(current);
-            current = prev[current.y][current.x];
+
+        // Reconstruct path
+        int targetIndex = targetY * width + targetX;
+        if (distTo[targetIndex] == Double.POSITIVE_INFINITY) {
+            return new ArrayList<>(); // No path exists
         }
-        if (current != null) {
-            path.add(graph[seedY][seedX]);
+
+        Stack<Node> path = new Stack<>();
+        for (Node current = graph[targetY][targetX];
+             current != null && !(current.x == seedX && current.y == seedY);
+             current = edgeTo[current.y * width + current.x]) {
+            path.push(current);
         }
-        Collections.reverse(path);
-        return path;
+        path.push(graph[seedY][seedX]);
+
+        // Convert stack to list
+        List<Node> result = new ArrayList<>();
+        while (!path.isEmpty()) {
+            result.add(path.pop());
+        }
+
+        return result;
     }
 
     private void saveToCSV(String outputDir) throws IOException {

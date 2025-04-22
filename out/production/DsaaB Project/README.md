@@ -47,3 +47,23 @@ a.when run the application, it shows that "please drop a ...."
 b.compressed problem
 
 c.make the application stick on the top to operate.
+
+### 2025.4.21 zyt
+
+try to solve the problem of scaled image.--GUI2
+
+(separate processing of two types of image) 
+
+### 2025.4.22 xbx
+1. solve problem of scaled image completely based on GUI
+try to do works according to gif
+2. add ending condition: double click
+3. after double clicks, point path between seed and last seed and use save button. But one problem, use dijkstra or straight line directly. Gif using dijkstra, but when we use it, the path not very well. I prefer the second one.
+4. add boolean isDragging: if double clicks, forbid MouthMove
+5. try to modify saveButton, save path and save the image
+6. optimize dijkstra slightly
+
+need to do:
+1. output saved image
+2. optimize load and compute
+3. GUI
