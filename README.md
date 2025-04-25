@@ -69,7 +69,7 @@ need to do:
 3. optimize edge
 4. GUI
 
-###2025.4.25 zyt
+### 2025.4.25 zyt
 1.add drag prompts
 2.add Cursor Snap, capable of automatically identifying the best in the field
 
