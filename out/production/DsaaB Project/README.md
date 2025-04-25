@@ -66,4 +66,5 @@ try to do works according to gif
 need to do:
 1. output saved image
 2. optimize load and compute
-3. GUI
+3. optimize edge
+4. GUI

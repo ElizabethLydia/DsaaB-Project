@@ -228,6 +228,35 @@ public class IntelligentScissorsPart1 {
         return result;
     }
 
+    //在给定坐标 (x, y) 周围邻域中搜索梯度最大的位置，用于 “Snap to Edge”功能。
+    public int[] findStrongestEdgeInNeighborhood(int x, int y, int windowSize) {
+        if (G == null) {
+            throw new IllegalStateException("Gradient not computed. Call computeGradients() first.");
+        }
+
+        int half = windowSize / 2;
+        int bestX = x;
+        int bestY = y;
+        double maxGrad = -1.0;
+
+        for (int dy = -half; dy <= half; dy++) {
+            for (int dx = -half; dx <= half; dx++) {
+                int nx = x + dx;
+                int ny = y + dy;
+
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    if (G[ny][nx] > maxGrad) {
+                        maxGrad = G[ny][nx];
+                        bestX = nx;
+                        bestY = ny;
+                    }
+                }
+            }
+        }
+
+        return new int[] { bestX, bestY };
+    }
+
     private void saveToCSV(String outputDir) throws IOException {
         File dir = new File(outputDir);
         if (!dir.exists()) {

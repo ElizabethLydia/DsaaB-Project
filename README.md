@@ -68,3 +68,14 @@ need to do:
 2. optimize load and compute
 3. optimize edge
 4. GUI
+
+###2025.4.25 zyt
+1.add drag prompts
+2.add Cursor Snap, capable of automatically identifying the best in the field
+
+to do:
+1.optimize load and compute
+2.optimize edge
+3.path cooling
+4.GUI
+5.save gif
