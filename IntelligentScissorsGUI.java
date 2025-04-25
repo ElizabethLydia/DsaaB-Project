@@ -35,6 +35,10 @@ public class IntelligentScissorsGUI extends JFrame {
         setLayout(new BorderLayout());
         seedNodes = new ArrayList<>();
         paths = new ArrayList<>();
+        setAlwaysOnTop(true);
+//        // 移除 setAlwaysOnTop(true)，改为初始置前
+//        toFront();
+//        requestFocus();
 
         // 图像显示区域
         imageLabel = new JLabel() {
@@ -175,12 +179,9 @@ public class IntelligentScissorsGUI extends JFrame {
                 Graphics2D g2d = output.createGraphics();
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-
-                // 填充整个图像为黑色
                 g2d.setColor(Color.BLACK);
                 g2d.fillRect(0, 0, width, height);
 
-                // 创建一个闭合路径
                 GeneralPath combinedPath = new GeneralPath();
                 boolean started = false;
                 for (List<Node> path : paths) {
@@ -195,39 +196,69 @@ public class IntelligentScissorsGUI extends JFrame {
                         }
                     }
                 }
-                combinedPath.closePath(); // 确保路径闭合
-
-                // 创建剪裁区域
+                combinedPath.closePath();
                 Area clipArea = new Area(combinedPath);
-
-                // 设置剪裁区域并绘制原始图像
                 g2d.setClip(clipArea);
                 g2d.drawImage(originalImage, 0, 0, null);
-                g2d.setClip(null); // 恢复默认剪裁区域
-
-//                // 绘制红色路径线条（包括闭合线段）
-//                g2d.setColor(Color.RED);
-//                g2d.setStroke(new BasicStroke(2));
-//                g2d.draw(combinedPath);
-
+                g2d.setClip(null);
                 g2d.dispose();
-                // 文件路径
-                File outputFile = new File("output.png");
 
-                // 如果文件存在，则删除
+                File outputFile = new File("output.png");
                 if (outputFile.exists()) {
                     outputFile.delete();
                 }
 
                 try {
+                    // 保存图像
+                    System.out.println("Saving output.png...");
                     ImageIO.write(output, "png", outputFile);
+                    System.out.println("Output file saved: " + outputFile.getAbsolutePath());
                     JOptionPane.showMessageDialog(this, "Path saved to output.png");
+
+                    // 确保文件存在
+                    if (!outputFile.exists()) {
+                        System.err.println("Error: output.png does not exist after saving.");
+                        JOptionPane.showMessageDialog(this, "Error: output.png was not found.");
+                        return;
+                    }
+
+                    // 读取并显示图像
+                    System.out.println("Reading output.png...");
+                    BufferedImage outputImage = ImageIO.read(outputFile);
+                    if (outputImage == null) {
+                        System.err.println("Error: Failed to read output.png.");
+                        JOptionPane.showMessageDialog(this, "Error: Failed to read output.png.");
+                        return;
+                    }
+
+                    // 在 EDT 上创建并显示窗口
+                    SwingUtilities.invokeLater(() -> {
+                        System.out.println("Creating output window...");
+                        JFrame outputFrame = new JFrame("Output Image");
+                        outputFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                        JLabel outputLabel = new JLabel(new ImageIcon(outputImage));
+                        outputFrame.add(new JScrollPane(outputLabel));
+                        // 图片的显示尺寸应该跟窗口大小一致
+                        int displayWidth = Math.min(outputImage.getWidth(), 800);
+                        int displayHeight = Math.min(outputImage.getHeight(), 600);
+                        outputFrame.setSize(displayWidth, displayHeight);
+                        outputFrame.setLocationRelativeTo(null);
+                        outputFrame.setAlwaysOnTop(true);
+                        outputFrame.setVisible(true);
+                        outputFrame.toFront();
+                        outputFrame.requestFocus();
+                        System.out.println("Output window displayed: " + displayWidth + "x" + displayHeight);
+                    });
                 } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(this, "Error saving image: " + ex.getMessage());
+                    System.err.println("Error saving or displaying image: " + ex.getMessage());
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(this, "Error saving or displaying image: " + ex.getMessage());
                 }
+            } else {
+                System.out.println("No paths to save.");
+                JOptionPane.showMessageDialog(this, "No paths to save.");
             }
         });
-        toolbar.add(saveButton);
 
         JCheckBox snapCheckbox = new JCheckBox("Cursor Snap");//表示一个开关状态(启用 / 禁用 边缘吸附)
         snapCheckbox.addActionListener(e -> {
@@ -252,7 +283,7 @@ public class IntelligentScissorsGUI extends JFrame {
                         int mouseY = (int) (e.getY() / scaleY);
 
                         if (cursorSnapEnabled) {
-                            int[] snapped = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 15);
+                            int[] snapped = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 25);
                             mouseX = snapped[0];
                             mouseY = snapped[1];
 
