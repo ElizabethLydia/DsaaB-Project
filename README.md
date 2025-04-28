@@ -88,3 +88,17 @@ To do:
 1. the output visualization's scale need to be the same as the gui
 2. the gui is setAlways on top, I don't know if it's ok
 3. the cusor snap is changed, now it has obvious effect, but the red curve is divided, it depends on the point of the mouse, rather than the seeds
+
+### 2025.4.29 xbx
+1. optimize computing the shortest by using multithreading
+2. try to use LWJGL to load image
+
+To do:
+1. debug of LWJGL(have some problems)
+2. optimize compute by using LWJGL(speed up by using GPU? Memory access, change data structure)
+3. optimize edge
+4. Real-time scale:solution to 'the gui is setAlways on top, I don't know if it's ok'
+5. the output visualization's scale need to be the same as the gui
+6. save gif
+7. the cusor snap is changed, now it has obvious effect, but the red curve is divided, it depends on the point of the mouse, rather than the seeds
+8. path cooling

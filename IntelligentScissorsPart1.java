@@ -4,9 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
-import java.util.PriorityQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import edu.princeton.cs.algs4.IndexMinPQ;
 import edu.princeton.cs.algs4.Stack;
 
@@ -36,6 +38,7 @@ class Link {
 public class IntelligentScissorsPart1 {
     private static final int[][] SX = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     private static final int[][] SY = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
+    private static final int NUM_THREADS = Runtime.getRuntime().availableProcessors();
 
     private BufferedImage image;
     private int width, height;
@@ -56,7 +59,7 @@ public class IntelligentScissorsPart1 {
         loadPixels();
     }
 
-    public IntelligentScissorsPart1(BufferedImage image) { //从 GUI 中传入已缩放或原始图像
+    public IntelligentScissorsPart1(BufferedImage image) {
         this.image = image;
         this.width = image.getWidth();
         this.height = image.getHeight();
@@ -70,37 +73,73 @@ public class IntelligentScissorsPart1 {
     }
 
     private void loadPixels() {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int rgb = image.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
-                pixels[y][x] = (int) (0.299 * r + 0.587 * g + 0.114 * b);
-            }
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int chunkSize = height / NUM_THREADS;
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height : (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        int rgb = image.getRGB(x, y);
+                        int r = (rgb >> 16) & 0xFF;
+                        int g = (rgb >> 8) & 0xFF;
+                        int b = rgb & 0xFF;
+                        pixels[y][x] = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
     private void computeGradients() {
-        for (int y = 1; y < height - 1; y++) {
-            for (int x = 1; x < width - 1; x++) {
-                double sumX = 0;
-                for (int dy = -1; dy <= 1; dy++) {
-                    for (int dx = -1; dx <= 1; dx++) {
-                        sumX += pixels[y + dy][x + dx] * SX[dy + 1][dx + 1];
-                    }
-                }
-                Ix[y][x] = sumX;
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int chunkSize = (height - 2) / NUM_THREADS;
 
-                double sumY = 0;
-                for (int dy = -1; dy <= 1; dy++) {
-                    for (int dx = -1; dx <= 1; dx++) {
-                        sumY += pixels[y + dy][x + dx] * SY[dy + 1][dx + 1];
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = 1 + t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height - 1 : 1 + (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 1; x < width - 1; x++) {
+                        double sumX = 0;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            for (int dx = -1; dx <= 1; dx++) {
+                                sumX += pixels[y + dy][x + dx] * SX[dy + 1][dx + 1];
+                            }
+                        }
+                        Ix[y][x] = sumX;
+
+                        double sumY = 0;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            for (int dx = -1; dx <= 1; dx++) {
+                                sumY += pixels[y + dy][x + dx] * SY[dy + 1][dx + 1];
+                            }
+                        }
+                        Iy[y][x] = sumY;
                     }
                 }
-                Iy[y][x] = sumY;
-            }
+            });
         }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 边界处理
         for (int x = 0; x < width; x++) {
             Ix[0][x] = Ix[height - 1][x] = 0;
             Iy[0][x] = Iy[height - 1][x] = 0;
@@ -112,47 +151,121 @@ public class IntelligentScissorsPart1 {
     }
 
     private void computeGradientMagnitude() {
-        double G_max = 0;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                G[y][x] = Math.sqrt(Ix[y][x] * Ix[y][x] + Iy[y][x] * Iy[y][x]);
-                if (G[y][x] > G_max) {
-                    G_max = G[y][x];
+        // 第一步：计算G和找到最大值
+        double[] localMaxG = new double[NUM_THREADS];
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int chunkSize = height / NUM_THREADS;
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int threadId = t;
+            final int startY = t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height : (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                double max = 0;
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        G[y][x] = Math.sqrt(Ix[y][x] * Ix[y][x] + Iy[y][x] * Iy[y][x]);
+                        if (G[y][x] > max) {
+                            max = G[y][x];
+                        }
+                    }
                 }
-            }
+                localMaxG[threadId] = max;
+            });
         }
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                f_G[y][x] = G_max == 0 ? 0 : (G_max - G[y][x]) / G_max;
-            }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 找出全局最大值
+        double G_max = Arrays.stream(localMaxG).filter(max -> max >= 0).max().orElse(0);
+
+        // 第二步：计算f_G
+        executor = Executors.newFixedThreadPool(NUM_THREADS);
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height : (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        f_G[y][x] = G_max == 0 ? 0 : (G_max - G[y][x]) / G_max;
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
     private void buildGraph() {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                graph[y][x] = new Node(x, y, f_G[y][x]);
-            }
-        }
-        // 添加邻居链接（8个方向）
-        int[] dx = {-1, -1, -1, 0, 0, 1, 1, 1}; // 8个方向的x偏移
-        int[] dy = {-1, 0, 1, -1, 1, -1, 0, 1}; // 8个方向的y偏移
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Node node = graph[y][x];
-                for (int i = 0; i < 8; i++) {
-                    int nx = x + dx[i];
-                    int ny = y + dy[i];
-                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        boolean isDiag = dx[i] != 0 && dy[i] != 0;
-                        double basecost = 1.0 / (1.0 + G[ny][nx]);
-                        double cost = isDiag ? basecost * Math.sqrt(2) : basecost; //对角线乘根号2
-//                        double avg_G = (G[y][x] + G[ny][nx]) / 2;
-//                        double cost = 1.0 / (1.0 + avg_G);
-                        node.neighbors.add(new Link(graph[ny][nx], cost));
+        // 第一步：创建所有节点
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int chunkSize = height / NUM_THREADS;
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height : (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        graph[y][x] = new Node(x, y, f_G[y][x]);
                     }
                 }
-            }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 第二步：添加邻居链接（8个方向）
+        executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int[] dx = {-1, -1, -1, 0, 0, 1, 1, 1};
+        int[] dy = {-1, 0, 1, -1, 1, -1, 0, 1};
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height : (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        Node node = graph[y][x];
+                        for (int i = 0; i < 8; i++) {
+                            int nx = x + dx[i];
+                            int ny = y + dy[i];
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                boolean isDiag = dx[i] != 0 && dy[i] != 0;
+                                double basecost = 1.0 / (1.0 + G[ny][nx]);
+                                double cost = isDiag ? basecost * Math.sqrt(2) : basecost;
+                                node.neighbors.add(new Link(graph[ny][nx], cost));
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
