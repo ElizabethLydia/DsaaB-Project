@@ -26,6 +26,7 @@ public class IntelligentScissorsGUI extends JFrame {
     private boolean isDragging = true; // 控制鼠标移动事件的标志
     private boolean cursorSnapEnabled = false;  // 控制是否启用 Cursor Snap 功能
 
+
     private int mouseX = -1;
     private int mouseY = -1;
 
@@ -241,7 +242,7 @@ public class IntelligentScissorsGUI extends JFrame {
                         // 图片的显示尺寸应该跟窗口大小一致
                         int displayWidth = Math.min(outputImage.getWidth(), 800);
                         int displayHeight = Math.min(outputImage.getHeight(), 600);
-                        outputFrame.setSize(displayWidth, displayHeight);
+                        outputFrame.setSize((int) (displayWidth/scaleX), (int) (displayHeight/scaleY));
                         outputFrame.setLocationRelativeTo(null);
                         outputFrame.setAlwaysOnTop(true);
                         outputFrame.setVisible(true);

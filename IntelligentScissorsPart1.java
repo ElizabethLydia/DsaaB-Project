@@ -36,8 +36,9 @@ class Link {
 }
 
 public class IntelligentScissorsPart1 {
-    private static final int[][] SX = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
-    private static final int[][] SY = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
+    // 修改Sobel算子为Scharr算子
+    private static final int[][] SX = {{-3, 0, 3}, {-10, 0, 10}, {-3, 0, 3}};
+    private static final int[][] SY = {{-3, -10, -3}, {0, 0, 0}, {3, 10, 3}};
     private static final int NUM_THREADS = Runtime.getRuntime().availableProcessors();
 
     private BufferedImage image;
@@ -70,6 +71,50 @@ public class IntelligentScissorsPart1 {
         this.f_G = new double[height][width];
         this.graph = new Node[height][width];
         loadPixels();
+    }
+
+    // 在IntelligentScissorsPart1类中添加
+    private void applyGaussianBlur() {
+        int[][] kernel = {
+                {1, 2, 1},
+                {2, 4, 2},
+                {1, 2, 1}
+        };
+        int[][] temp = new int[height][width];
+
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int chunkSize = (height - 2) / NUM_THREADS;
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = 1 + t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height - 1 : 1 + (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 1; x < width - 1; x++) {
+                        int sum = 0;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            for (int dx = -1; dx <= 1; dx++) {
+                                sum += pixels[y + dy][x + dx] * kernel[dy + 1][dx + 1];
+                            }
+                        }
+                        temp[y][x] = sum / 16;
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 更新像素数组
+        for (int y = 1; y < height - 1; y++) {
+            System.arraycopy(temp[y], 1, pixels[y], 1, width - 2);
+        }
     }
 
     private void loadPixels() {
@@ -147,6 +192,54 @@ public class IntelligentScissorsPart1 {
         for (int y = 0; y < height; y++) {
             Ix[y][0] = Ix[y][width - 1] = 0;
             Iy[y][0] = Iy[y][width - 1] = 0;
+        }
+    }
+
+    // 在process方法中添加
+    private void edgeEnhancement() {
+        ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
+        int chunkSize = (height - 2) / NUM_THREADS;
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = 1 + t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height - 1 : 1 + (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 1; x < width - 1; x++) {
+                        // 非极大值抑制
+                        double angle = Math.atan2(Iy[y][x], Ix[y][x]);
+                        double q = 255, r = 255;
+
+                        if (angle <= Math.PI/8 || angle > 7*Math.PI/8) {
+                            q = G[y][x+1];
+                            r = G[y][x-1];
+                        } else if (angle > Math.PI/8 && angle <= 3*Math.PI/8) {
+                            q = G[y+1][x+1];
+                            r = G[y-1][x-1];
+                        } else if (angle > 3*Math.PI/8 && angle <= 5*Math.PI/8) {
+                            q = G[y+1][x];
+                            r = G[y-1][x];
+                        } else {
+                            q = G[y+1][x-1];
+                            r = G[y-1][x+1];
+                        }
+
+                        if (G[y][x] >= q && G[y][x] >= r) {
+                            G[y][x] = G[y][x];
+                        } else {
+                            G[y][x] = 0;
+                        }
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -403,7 +496,9 @@ public class IntelligentScissorsPart1 {
     }
 
     public void process() throws IOException {
+        applyGaussianBlur();    // 新增
         computeGradients();
+        edgeEnhancement();      // 新增
         computeGradientMagnitude();
         buildGraph();
         saveToCSV("output");
