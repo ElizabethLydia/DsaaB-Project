@@ -26,9 +26,6 @@ public class IntelligentScissorsGUI extends JFrame {
     private boolean isDragging = true; // 控制鼠标移动事件的标志
     private boolean cursorSnapEnabled = false;  // 控制是否启用 Cursor Snap 功能
 
-    private int mouseX = -1;
-    private int mouseY = -1;
-
     public IntelligentScissorsGUI() {
         setTitle("Intelligent Scissors");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -279,17 +276,17 @@ public class IntelligentScissorsGUI extends JFrame {
                         paths.clear();
                         imageLabel.repaint();
                     } else if (e.getButton() == MouseEvent.BUTTON1) {// 左键添加种子点
-                        int mouseX = (int) (e.getX() / scaleX); // 转换为原始坐标
-                        int mouseY = (int) (e.getY() / scaleY);
+                        int x = (int) (e.getX() / scaleX); // 转换为原始坐标
+                        int y = (int) (e.getY() / scaleY);
 
                         if (cursorSnapEnabled) {
-                            int[] snapped = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 25);
-                            mouseX = snapped[0];
-                            mouseY = snapped[1];
+                            int[] snapped = processor.findStrongestEdgeInNeighborhood(x, y, 25);
+                            x = snapped[0];
+                            y = snapped[1];
 
                         }
-                        if (mouseX >= 0 && mouseX < originalImage.getWidth() && mouseY >= 0 && mouseY < originalImage.getHeight()) {
-                            Node newSeed = processor.getGraph()[mouseY][mouseX];
+                        if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
+                            Node newSeed = processor.getGraph()[y][x];
                             seedNodes.add(newSeed);
 //                        if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
 //                            Node newSeed = processor.getGraph()[y][x];
@@ -332,43 +329,21 @@ public class IntelligentScissorsGUI extends JFrame {
             @Override
             public void mouseMoved(MouseEvent e) {
                 if (processor != null && originalImage != null && !seedNodes.isEmpty() && isDragging) {
-//                    int x = (int) (e.getX() / scaleX); // 转换为原始坐标
-//                    int y = (int) (e.getY() / scaleY);
-//                    if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
-//                        // 计算从最后一个种子点到鼠标位置的临时路径
-//                        Node lastSeed = seedNodes.get(seedNodes.size() - 1);
-//                        List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, x, y);
-//                        // 临时替换最后一个路径（不保存）
-//                        List<List<Node>> tempPaths = new ArrayList<>(paths);
-//                        if (!tempPaths.isEmpty()) {
-//                            tempPaths.remove(tempPaths.size() - 1);
-//                        }
-//                        tempPaths.add(tempPath);
-//                        // 绘制临时路径
-//                        imageLabel.repaint();
-//                        // 恢复paths，避免影响保存
-//                        paths.clear();
-//                        paths.addAll(tempPaths.subList(0, tempPaths.size() - 1));
-//                        if (!tempPath.isEmpty()) {
-//                            paths.add(tempPath);
-//                        }
-//                    }
-
                     // 获取鼠标坐标并转换为原始图像坐标
-                    int mouseX = (int) (e.getX() / scaleX);
-                    int mouseY = (int) (e.getY() / scaleY);
+                    int x = (int) (e.getX() / scaleX);
+                    int y = (int) (e.getY() / scaleY);
 
                     // 如果启用了 Cursor Snap 功能，则根据邻域强度调整鼠标位置
                     if (cursorSnapEnabled) {
-                        int[] adjusted = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 15);
-                        mouseX = adjusted[0];
-                        mouseY = adjusted[1];
+                        int[] snapped = processor.findStrongestEdgeInNeighborhood(x, y, 25);
+                        x = snapped[0];
+                        y = snapped[1];
                     }
 
-                    if (mouseX >= 0 && mouseX < originalImage.getWidth() && mouseY >= 0 && mouseY < originalImage.getHeight()) {
+                    if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
                         // 计算从最后一个种子点到鼠标位置的临时路径
                         Node lastSeed = seedNodes.get(seedNodes.size() - 1);
-                        List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, mouseX, mouseY);
+                        List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, x, y);
 
                         // 临时替换最后一个路径（不保存）
                         List<List<Node>> tempPaths = new ArrayList<>(paths);

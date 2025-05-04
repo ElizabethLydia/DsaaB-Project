@@ -82,4 +82,9 @@ To do:
 
 ### 2025.4.25 fjy
 1. fix the problem of leaving the gui always on top
-2. 
+2. show the output image
+
+To do:
+1. the output visualization's scale need to be the same as the gui
+2. the gui is setAlways on top, I don't know if it's ok
+3. the cusor snap is changed, now it has obvious effect, but the red curve is divided, it depends on the point of the mouse, rather than the seeds

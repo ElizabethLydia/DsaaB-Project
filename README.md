@@ -88,3 +88,6 @@ To do:
 1. the output visualization's scale need to be the same as the gui
 2. the gui is setAlways on top, I don't know if it's ok
 3. the cusor snap is changed, now it has obvious effect, but the red curve is divided, it depends on the point of the mouse, rather than the seeds
+
+### 2025.4.30 zyt
+1. fix the cusor snap, now both the mouse and the line are correct.
