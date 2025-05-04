@@ -115,4 +115,4 @@ To do:
 4. the output visualization's scale need to be the same as the gui
 5. save gif: need maven proj
 6. the cusor snap is changed, now it has obvious effect, but the red curve is divided, it depends on the point of the mouse, rather than the seeds
-7. optimize path cooling by 动态阈值调整 路径方向预测 性能优化
+7. path cooling and optimize path cooling (动态阈值调整 路径方向预测 性能优化)
