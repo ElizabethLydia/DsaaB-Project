@@ -25,6 +25,8 @@ public class IntelligentScissorsGUI extends JFrame {
     private double scaleX = 1.0, scaleY = 1.0; // 缩放比例
     private boolean isDragging = true; // 控制鼠标移动事件的标志
     private boolean cursorSnapEnabled = false;  // 控制是否启用 Cursor Snap 功能
+    private int displayWidth; // 图像显示宽度
+    private int displayHeight; // 图像显示高度
 
 
     private int mouseX = -1;
@@ -48,7 +50,7 @@ public class IntelligentScissorsGUI extends JFrame {
                 super.paintComponent(g);
                 Graphics2D g2d = (Graphics2D) g;
 
-                // 如果没有图像，绘制“可拖拽加载图片”提示
+                // 如果没有图像，绘制提示
                 if (originalImage == null) {
                     String text = "You can also drag and load image here";
                     Font font = new Font("微软雅黑", Font.PLAIN, 24);
@@ -58,13 +60,12 @@ public class IntelligentScissorsGUI extends JFrame {
                     int textHeight = fm.getHeight();
                     int x = (getWidth() - textWidth) / 2;
                     int y = (getHeight() + textHeight) / 2;
-
                     g2d.setColor(Color.GRAY);
                     g2d.drawString(text, x, y);
-                    return; // 没有图像时不需要画路径等，直接返回
+                    return;
                 }
 
-                g2d.setStroke(new BasicStroke(2)); // 加粗路径线条
+                g2d.setStroke(new BasicStroke(2));
                 // 绘制所有路径段
                 g2d.setColor(Color.RED);
                 for (List<Node> path : paths) {
@@ -87,13 +88,6 @@ public class IntelligentScissorsGUI extends JFrame {
                     int y = (int) (seed.y * scaleY);
                     g2d.fillOval(x - 3, y - 3, 6, 6);
                 }
-
-//                if (mouseX >= 0 && mouseY >= 0) {
-//                    int drawX = (int) (mouseX * scaleX);
-//                    int drawY = (int) (mouseY * scaleY);
-//                    g.setColor(Color.RED);
-//                    g.drawOval(drawX - 3, drawY - 3, 6, 6);  // 小红圈
-//                }
             }
         };
         JScrollPane scrollPane = new JScrollPane(imageLabel);
@@ -182,7 +176,6 @@ public class IntelligentScissorsGUI extends JFrame {
                 g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 g2d.setColor(Color.BLACK);
                 g2d.fillRect(0, 0, width, height);
-
                 GeneralPath combinedPath = new GeneralPath();
                 boolean started = false;
                 for (List<Node> path : paths) {
@@ -203,27 +196,20 @@ public class IntelligentScissorsGUI extends JFrame {
                 g2d.drawImage(originalImage, 0, 0, null);
                 g2d.setClip(null);
                 g2d.dispose();
-
                 File outputFile = new File("output.png");
                 if (outputFile.exists()) {
                     outputFile.delete();
                 }
-
                 try {
-                    // 保存图像
                     System.out.println("Saving output.png...");
                     ImageIO.write(output, "png", outputFile);
                     System.out.println("Output file saved: " + outputFile.getAbsolutePath());
                     JOptionPane.showMessageDialog(this, "Path saved to output.png");
-
-                    // 确保文件存在
                     if (!outputFile.exists()) {
                         System.err.println("Error: output.png does not exist after saving.");
                         JOptionPane.showMessageDialog(this, "Error: output.png was not found.");
                         return;
                     }
-
-                    // 读取并显示图像
                     System.out.println("Reading output.png...");
                     BufferedImage outputImage = ImageIO.read(outputFile);
                     if (outputImage == null) {
@@ -231,24 +217,24 @@ public class IntelligentScissorsGUI extends JFrame {
                         JOptionPane.showMessageDialog(this, "Error: Failed to read output.png.");
                         return;
                     }
-
-                    // 在 EDT 上创建并显示窗口
                     SwingUtilities.invokeLater(() -> {
                         System.out.println("Creating output window...");
                         JFrame outputFrame = new JFrame("Output Image");
                         outputFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                        JLabel outputLabel = new JLabel(new ImageIcon(outputImage));
+                        // 缩放图像以匹配主 GUI 显示尺寸
+                        Image scaledOutputImage = outputImage.getScaledInstance(displayWidth, displayHeight, Image.SCALE_SMOOTH);
+                        JLabel outputLabel = new JLabel(new ImageIcon(scaledOutputImage));
                         outputFrame.add(new JScrollPane(outputLabel));
-                        // 图片的显示尺寸应该跟窗口大小一致
-                        int displayWidth = Math.min(outputImage.getWidth(), 800);
-                        int displayHeight = Math.min(outputImage.getHeight(), 600);
-                        outputFrame.setSize((int) (displayWidth/scaleX), (int) (displayHeight/scaleY));
+                        // 设置窗口尺寸
+                        int frameWidth = displayWidth + 20; // 边框偏移
+                        int frameHeight = displayHeight + 40; // 包含标题栏
+                        outputFrame.setSize(frameWidth, frameHeight);
                         outputFrame.setLocationRelativeTo(null);
                         outputFrame.setAlwaysOnTop(true);
                         outputFrame.setVisible(true);
                         outputFrame.toFront();
                         outputFrame.requestFocus();
-                        System.out.println("Output window displayed: " + displayWidth + "x" + displayHeight);
+                        System.out.println("Output window displayed: " + frameWidth + "x" + frameHeight);
                     });
                 } catch (IOException ex) {
                     System.err.println("Error saving or displaying image: " + ex.getMessage());
@@ -260,6 +246,7 @@ public class IntelligentScissorsGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "No paths to save.");
             }
         });
+        toolbar.add(saveButton);
 
         JCheckBox snapCheckbox = new JCheckBox("Cursor Snap");//表示一个开关状态(启用 / 禁用 边缘吸附)
         snapCheckbox.addActionListener(e -> {
@@ -279,117 +266,99 @@ public class IntelligentScissorsGUI extends JFrame {
                         seedNodes.clear();
                         paths.clear();
                         imageLabel.repaint();
-                    } else if (e.getButton() == MouseEvent.BUTTON1) {// 左键添加种子点
-                        int mouseX = (int) (e.getX() / scaleX); // 转换为原始坐标
+                    } else if (e.getButton() == MouseEvent.BUTTON1) { // 左键添加种子点
+                        // 获取鼠标坐标并转换为原始图像坐标
+                        int mouseX = (int) (e.getX() / scaleX);
                         int mouseY = (int) (e.getY() / scaleY);
 
+                        // 边界检查
+                        if (mouseX < 0 || mouseX >= originalImage.getWidth() || mouseY < 0 || mouseY >= originalImage.getHeight()) {
+                            return;
+                        }
+
+                        // 如果启用了 Cursor Snap，调整到最强边缘点
                         if (cursorSnapEnabled) {
                             int[] snapped = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 25);
                             mouseX = snapped[0];
                             mouseY = snapped[1];
-
                         }
-                        if (mouseX >= 0 && mouseX < originalImage.getWidth() && mouseY >= 0 && mouseY < originalImage.getHeight()) {
-                            Node newSeed = processor.getGraph()[mouseY][mouseX];
-                            seedNodes.add(newSeed);
-//                        if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
-//                            Node newSeed = processor.getGraph()[y][x];
-//                            seedNodes.add(newSeed);
-                            if (e.getClickCount() >= 2){ //双击
-//                                Node seed = seedNodes.get(0);
-//                                List<Node> path = processor.computeShortestPath(seed.x, seed.y, newSeed.x, newSeed.y);
-//                                if (!path.isEmpty()) {
-//                                    paths.add(path);
-//                                }
-                                if (!seedNodes.isEmpty()) {
-                                    Node first = seedNodes.get(0);
-                                    Node last = seedNodes.get(seedNodes.size() - 1);
-                                    List<Node> closingPath = new ArrayList<>();
-                                    closingPath.add(first);
-                                    closingPath.add(last);
+
+                        // 创建新种子点
+                        Node newSeed = processor.getGraph()[mouseY][mouseX];
+                        seedNodes.add(newSeed);
+
+                        if (e.getClickCount() >= 2) { // 双击闭合路径
+                            System.out.println("Double-click: Closing path...");
+                            if (seedNodes.size() >= 2) {
+                                Node first = seedNodes.get(0);
+                                Node last = seedNodes.get(seedNodes.size() - 1);
+                                // 使用吸附点计算闭合路径
+                                List<Node> closingPath = processor.computeShortestPath(last.x, last.y, first.x, first.y);
+                                if (!closingPath.isEmpty()) {
                                     paths.add(closingPath);
-                                    imageLabel.repaint();
-                                    isDragging = false;
-                                }
-                                saveButton.doClick();
-                            }else {
-                                // 如果不是第一个种子点，计算路径
-                                if (seedNodes.size() >= 2) {
-                                    Node prevSeed = seedNodes.get(seedNodes.size() - 2);
-                                    List<Node> path = processor.computeShortestPath(prevSeed.x, prevSeed.y, newSeed.x, newSeed.y);
-                                    if (!path.isEmpty()) {
-                                        paths.add(path);
-                                    }
                                 }
                                 imageLabel.repaint();
+                                isDragging = false; // 停止拖动
+                                saveButton.doClick(); // 自动保存
                             }
+                        } else {
+                            // 单击：添加路径到上一个种子点
+                            if (seedNodes.size() >= 2) {
+                                Node prevSeed = seedNodes.get(seedNodes.size() - 2);
+                                List<Node> path = processor.computeShortestPath(prevSeed.x, prevSeed.y, newSeed.x, newSeed.y);
+                                if (!path.isEmpty()) {
+                                    paths.add(path);
+                                }
+                            }
+                            imageLabel.repaint();
                         }
+                        System.out.println("Seed added: (" + mouseX + ", " + mouseY + ")");
                     }
                 }
             }
-
         });
         imageLabel.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
                 if (processor != null && originalImage != null && !seedNodes.isEmpty() && isDragging) {
-//                    int x = (int) (e.getX() / scaleX); // 转换为原始坐标
-//                    int y = (int) (e.getY() / scaleY);
-//                    if (x >= 0 && x < originalImage.getWidth() && y >= 0 && y < originalImage.getHeight()) {
-//                        // 计算从最后一个种子点到鼠标位置的临时路径
-//                        Node lastSeed = seedNodes.get(seedNodes.size() - 1);
-//                        List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, x, y);
-//                        // 临时替换最后一个路径（不保存）
-//                        List<List<Node>> tempPaths = new ArrayList<>(paths);
-//                        if (!tempPaths.isEmpty()) {
-//                            tempPaths.remove(tempPaths.size() - 1);
-//                        }
-//                        tempPaths.add(tempPath);
-//                        // 绘制临时路径
-//                        imageLabel.repaint();
-//                        // 恢复paths，避免影响保存
-//                        paths.clear();
-//                        paths.addAll(tempPaths.subList(0, tempPaths.size() - 1));
-//                        if (!tempPath.isEmpty()) {
-//                            paths.add(tempPath);
-//                        }
-//                    }
-
                     // 获取鼠标坐标并转换为原始图像坐标
                     int mouseX = (int) (e.getX() / scaleX);
                     int mouseY = (int) (e.getY() / scaleY);
 
-                    // 如果启用了 Cursor Snap 功能，则根据邻域强度调整鼠标位置
+                    // 边界检查
+                    if (mouseX < 0 || mouseX >= originalImage.getWidth() || mouseY < 0 || mouseY >= originalImage.getHeight()) {
+                        return;
+                    }
+
+                    // 如果启用了 Cursor Snap，调整到最强边缘点
                     if (cursorSnapEnabled) {
                         int[] adjusted = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 15);
                         mouseX = adjusted[0];
                         mouseY = adjusted[1];
                     }
 
-                    if (mouseX >= 0 && mouseX < originalImage.getWidth() && mouseY >= 0 && mouseY < originalImage.getHeight()) {
-                        // 计算从最后一个种子点到鼠标位置的临时路径
-                        Node lastSeed = seedNodes.get(seedNodes.size() - 1);
-                        List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, mouseX, mouseY);
+                    // 计算从最后一个种子点到吸附点的临时路径
+                    Node lastSeed = seedNodes.get(seedNodes.size() - 1);
+                    List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, mouseX, mouseY);
 
-                        // 临时替换最后一个路径（不保存）
-                        List<List<Node>> tempPaths = new ArrayList<>(paths);
-                        if (!tempPaths.isEmpty()) {
-                            tempPaths.remove(tempPaths.size() - 1);
-                        }
-                        tempPaths.add(tempPath);
-
-                        // 绘制临时路径
-                        imageLabel.repaint();
-
-                        // 恢复 paths，避免影响保存
-                        paths.clear();
-                        paths.addAll(tempPaths.subList(0, tempPaths.size() - 1));
-                        if (!tempPath.isEmpty()) {
-                            paths.add(tempPath);
-                        }
+                    // 保存当前 paths 以便恢复
+                    List<List<Node>> oldPaths = new ArrayList<>(paths);
+                    if (!paths.isEmpty()) {
+                        paths.remove(paths.size() - 1); // 移除旧临时路径
                     }
+                    if (!tempPath.isEmpty()) {
+                        paths.add(tempPath); // 添加新临时路径
+                    }
+
+                    // 触发重绘
+                    imageLabel.repaint();
+
+                    // 恢复原始 paths
+                    paths.clear();
+                    paths.addAll(oldPaths);
                 }
-                // 显示原始坐标
+
+                // 更新标题栏坐标
                 int x = (int) (e.getX() / scaleX);
                 int y = (int) (e.getY() / scaleY);
                 setTitle("Intelligent Scissors - (" + x + ", " + y + ")");
@@ -435,31 +404,31 @@ public class IntelligentScissorsGUI extends JFrame {
         if (originalImage == null) return;
         BufferedImage displayImage = showGradient ? gradientImage : originalImage;
         if (fitWindow) {
-            // 计算缩放比例
-            int maxWidth = getWidth();
-            int maxHeight = getHeight();
+            JViewport viewport = ((JScrollPane) imageLabel.getParent().getParent()).getViewport();
+            int maxWidth = viewport.getWidth();
+            int maxHeight = viewport.getHeight();
             double scale = Math.min((double) maxWidth / displayImage.getWidth(),
                     (double) maxHeight / displayImage.getHeight());
-//            scaleX = scale;
-//            scaleY = scale;
             int scaledWidth = (int) (displayImage.getWidth() * scale);
             int scaledHeight = (int) (displayImage.getHeight() * scale);
             Image scaled = displayImage.getScaledInstance(scaledWidth, scaledHeight, Image.SCALE_SMOOTH);
             imageLabel.setIcon(new ImageIcon(scaled));
             imageLabel.setPreferredSize(new Dimension(scaledWidth, scaledHeight));
-
-            // 更新缩放比例：确保 scaleX/scaleY 是**实际显示出来的比例**
             scaleX = (double) scaledWidth / originalImage.getWidth();
             scaleY = (double) scaledHeight / originalImage.getHeight();
+            displayWidth = scaledWidth;
+            displayHeight = scaledHeight;
         } else {
-            // 原始尺寸
             scaleX = 1.0;
             scaleY = 1.0;
             imageLabel.setIcon(new ImageIcon(displayImage));
             imageLabel.setPreferredSize(new Dimension(displayImage.getWidth(), displayImage.getHeight()));
+            displayWidth = displayImage.getWidth();
+            displayHeight = displayImage.getHeight();
         }
         imageLabel.revalidate();
         imageLabel.repaint();
+        System.out.println("Display size updated: " + displayWidth + "x" + displayHeight);
     }
 
     @Override

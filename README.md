@@ -116,3 +116,7 @@ To do:
 5. save gif: need maven proj
 6. the cusor snap is changed, now it has obvious effect, but the red curve is divided, it depends on the point of the mouse, rather than the seeds
 7. path cooling and optimize path cooling (动态阈值调整 路径方向预测 性能优化)
+
+### 2025.5.4 fjy
+1. fix the code to save the output image, the size now is the same as the gui
+2. fix the code of cursor, now the curve is smooth without sepeate points
