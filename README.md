@@ -123,3 +123,4 @@ To do:
 
 ### 2025.5.5 zyt
 1、fix the problem of cursor(nodes and lines are all obvious)
+2、add and implement pathing cooling

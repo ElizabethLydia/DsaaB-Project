@@ -120,3 +120,7 @@ To do:
 ### 2025.5.4 fjy
 1. fix the code to save the output image, the size now is the same as the gui
 2. fix the code of cursor, now the curve is smooth without sepeate points
+
+### 2025.5.5 zyt
+1、fix the problem of cursor(nodes and lines are all obvious)
+2、add and implement pathing cooling

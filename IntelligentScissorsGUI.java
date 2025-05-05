@@ -24,7 +24,11 @@ public class IntelligentScissorsGUI extends JFrame {
     private boolean fitWindow = true; // 默认适应窗口
     private double scaleX = 1.0, scaleY = 1.0; // 缩放比例
     private boolean isDragging = true; // 控制鼠标移动事件的标志
-    private boolean cursorSnapEnabled = false;  // 控制是否启用 Cursor Snap 功能
+    private boolean cursorSnapEnabled = false;  // 控制是否启用 Cursor Snap
+    private boolean pathCoolingEnabled = false; //是否启用 path cooling
+    private List<Node> previousPath = new ArrayList<>(); // 上一条路径
+    private int stableCounter = 0;                 // 连续稳定次数
+    private final int STABILITY_THRESHOLD = 22;    // 稳定次数阈值
     private int displayWidth; // 图像显示宽度
     private int displayHeight; // 图像显示高度
 
@@ -245,11 +249,18 @@ public class IntelligentScissorsGUI extends JFrame {
         });
         toolbar.add(saveButton);
 
-        JCheckBox snapCheckbox = new JCheckBox("Cursor Snap");//表示一个开关状态(启用 / 禁用 边缘吸附)
-        snapCheckbox.addActionListener(e -> {
-            cursorSnapEnabled = snapCheckbox.isSelected();
+        JCheckBox snapCheckBox = new JCheckBox("Cursor Snap");//表示一个开关状态(启用 / 禁用 边缘吸附)
+        snapCheckBox.addActionListener(e -> {
+            cursorSnapEnabled = snapCheckBox.isSelected();
         });
-        toolbar.add(snapCheckbox);
+        toolbar.add(snapCheckBox);
+
+        JCheckBox pathCoolingCheckBox = new JCheckBox("Path Cooling");
+        pathCoolingCheckBox.addActionListener(e -> {
+            pathCoolingEnabled = pathCoolingCheckBox.isSelected();
+        });
+        toolbar.add(pathCoolingCheckBox);
+
         add(toolbar, BorderLayout.NORTH);
 
 
@@ -275,6 +286,7 @@ public class IntelligentScissorsGUI extends JFrame {
 
                         // 启用 Cursor Snap，调整到最强边缘点
                         if (cursorSnapEnabled) {
+                            System.out.println("Activate cursor snap...");
                             int[] snapped = processor.findStrongestEdgeInNeighborhood(x, y, 25);
                             x = snapped[0];
                             y = snapped[1];
@@ -354,6 +366,29 @@ public class IntelligentScissorsGUI extends JFrame {
                     if (!tempPath.isEmpty()) {
                         paths.add(tempPath);
                     }
+
+                    //path cooling
+                    if (pathCoolingEnabled && tempPath != null && !tempPath.isEmpty()) {
+                        int stableLength = 30; // 前多少个点必须完全一致才认为是“稳定”
+
+                        if (isPathStable(previousPath, tempPath, stableLength)) {
+                            stableCounter++;
+                            if (stableCounter >= STABILITY_THRESHOLD) {
+                                // 冻结路径，将当前路径末尾变成新的种子点
+                                Node newSeed = tempPath.get(tempPath.size() - 1);
+                                seedNodes.add(newSeed);
+                                paths.add(new ArrayList<>(tempPath)); // 保存该段路径
+                                previousPath.clear();
+                                stableCounter = 0;
+                                System.out.println("Path frozen at: (" + newSeed.x + ", " + newSeed.y + ")");
+                            }
+                        } else {
+                            // 路径不稳定则重置
+                            stableCounter = 0;
+                            previousPath = new ArrayList<>(tempPath);
+                        }
+                    }
+
                 }
             // 更新标题栏坐标
                 int x = (int) (e.getX() / scaleX);
@@ -372,6 +407,19 @@ public class IntelligentScissorsGUI extends JFrame {
                 updateImageDisplay();
             }
         });
+    }
+
+    // path cooling detect stable path
+    private boolean isPathStable(List<Node> path1, List<Node> path2, int length) {
+        if (path1 == null || path2 == null) return false;
+        if (path1.size() < length || path2.size() < length) return false;
+
+        for (int i = 0; i < length; i++) {
+            Node n1 = path1.get(i);
+            Node n2 = path2.get(i);
+            if (n1.x != n2.x || n1.y != n2.y) return false;
+        }
+        return true;
     }
 
     private void loadImage() {
