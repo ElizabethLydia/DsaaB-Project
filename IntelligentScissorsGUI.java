@@ -29,9 +29,6 @@ public class IntelligentScissorsGUI extends JFrame {
     private int displayHeight; // 图像显示高度
 
 
-    private int mouseX = -1;
-    private int mouseY = -1;
-
     public IntelligentScissorsGUI() {
         setTitle("Intelligent Scissors");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -268,23 +265,23 @@ public class IntelligentScissorsGUI extends JFrame {
                         imageLabel.repaint();
                     } else if (e.getButton() == MouseEvent.BUTTON1) { // 左键添加种子点
                         // 获取鼠标坐标并转换为原始图像坐标
-                        int mouseX = (int) (e.getX() / scaleX);
-                        int mouseY = (int) (e.getY() / scaleY);
+                        int x = (int) (e.getX() / scaleX);
+                        int y = (int) (e.getY() / scaleY);
 
                         // 边界检查
-                        if (mouseX < 0 || mouseX >= originalImage.getWidth() || mouseY < 0 || mouseY >= originalImage.getHeight()) {
+                        if (x < 0 || x >= originalImage.getWidth() || y < 0 || y >= originalImage.getHeight()) {
                             return;
                         }
 
-                        // 如果启用了 Cursor Snap，调整到最强边缘点
+                        // 启用 Cursor Snap，调整到最强边缘点
                         if (cursorSnapEnabled) {
-                            int[] snapped = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 25);
-                            mouseX = snapped[0];
-                            mouseY = snapped[1];
+                            int[] snapped = processor.findStrongestEdgeInNeighborhood(x, y, 25);
+                            x = snapped[0];
+                            y = snapped[1];
                         }
 
                         // 创建新种子点
-                        Node newSeed = processor.getGraph()[mouseY][mouseX];
+                        Node newSeed = processor.getGraph()[y][x];
                         seedNodes.add(newSeed);
 
                         if (e.getClickCount() >= 2) { // 双击闭合路径
@@ -298,8 +295,8 @@ public class IntelligentScissorsGUI extends JFrame {
                                     paths.add(closingPath);
                                 }
                                 imageLabel.repaint();
-                                isDragging = false; // 停止拖动
-                                saveButton.doClick(); // 自动保存
+                                isDragging = false;
+                                saveButton.doClick();
                             }
                         } else {
                             // 单击：添加路径到上一个种子点
@@ -312,7 +309,7 @@ public class IntelligentScissorsGUI extends JFrame {
                             }
                             imageLabel.repaint();
                         }
-                        System.out.println("Seed added: (" + mouseX + ", " + mouseY + ")");
+                        System.out.println("Seed added: (" + x + ", " + y + ")");
                     }
                 }
             }
@@ -322,43 +319,43 @@ public class IntelligentScissorsGUI extends JFrame {
             public void mouseMoved(MouseEvent e) {
                 if (processor != null && originalImage != null && !seedNodes.isEmpty() && isDragging) {
                     // 获取鼠标坐标并转换为原始图像坐标
-                    int mouseX = (int) (e.getX() / scaleX);
-                    int mouseY = (int) (e.getY() / scaleY);
+                    int x = (int) (e.getX() / scaleX);
+                    int y = (int) (e.getY() / scaleY);
 
                     // 边界检查
-                    if (mouseX < 0 || mouseX >= originalImage.getWidth() || mouseY < 0 || mouseY >= originalImage.getHeight()) {
+                    if (x < 0 || x >= originalImage.getWidth() || y < 0 || y >= originalImage.getHeight()) {
                         return;
                     }
 
-                    // 如果启用了 Cursor Snap，调整到最强边缘点
+                    // 启用 Cursor Snap，调整到最强边缘点
                     if (cursorSnapEnabled) {
-                        int[] adjusted = processor.findStrongestEdgeInNeighborhood(mouseX, mouseY, 15);
-                        mouseX = adjusted[0];
-                        mouseY = adjusted[1];
+                        int[] adjusted = processor.findStrongestEdgeInNeighborhood(x, y, 25);
+                        x = adjusted[0];
+                        y = adjusted[1];
                     }
 
                     // 计算从最后一个种子点到吸附点的临时路径
                     Node lastSeed = seedNodes.get(seedNodes.size() - 1);
-                    List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, mouseX, mouseY);
+                    List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, x, y);
 
-                    // 保存当前 paths 以便恢复
-                    List<List<Node>> oldPaths = new ArrayList<>(paths);
-                    if (!paths.isEmpty()) {
-                        paths.remove(paths.size() - 1); // 移除旧临时路径
+                    // 临时替换最后一个路径（不保存）
+                    List<List<Node>> tempPaths = new ArrayList<>(paths);
+                    if (!tempPaths.isEmpty()) {
+                        tempPaths.remove(tempPaths.size() - 1);
                     }
-                    if (!tempPath.isEmpty()) {
-                        paths.add(tempPath); // 添加新临时路径
-                    }
+                    tempPaths.add(tempPath);
 
-                    // 触发重绘
+                    // 绘制临时路径
                     imageLabel.repaint();
 
-                    // 恢复原始 paths
+                    // 恢复 paths，避免影响保存
                     paths.clear();
-                    paths.addAll(oldPaths);
+                    paths.addAll(tempPaths.subList(0, tempPaths.size() - 1));
+                    if (!tempPath.isEmpty()) {
+                        paths.add(tempPath);
+                    }
                 }
-
-                // 更新标题栏坐标
+            // 更新标题栏坐标
                 int x = (int) (e.getX() / scaleX);
                 int y = (int) (e.getY() / scaleY);
                 setTitle("Intelligent Scissors - (" + x + ", " + y + ")");
