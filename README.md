@@ -122,5 +122,5 @@ To do:
 2. fix the code of cursor, now the curve is smooth without sepeate points
 
 ### 2025.5.5 zyt
-1、fix the problem of cursor(nodes and lines are all obvious)
-2、add and implement pathing cooling
+1. fix the problem of cursor(nodes and lines are all obvious)
+2. add and implement pathing cooling
