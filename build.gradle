@@ -1,0 +1,63 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['.'] // 源代码在根目录
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+def lwjglVersion = "3.3.3"
+// 根据操作系统和架构自动选择 natives
+def os = System.getProperty('os.name').toLowerCase()
+def arch = System.getProperty('os.arch').toLowerCase()
+
+def lwjglNatives
+if (os.contains('mac')) {
+    lwjglNatives = arch.contains('aarch64') ? 'natives-macos-arm64' : 'natives-macos'
+} else if (os.contains('linux')) {
+    lwjglNatives = 'natives-linux' + (arch.contains('64') ? '64' : '')
+} else if (os.contains('windows')) {
+    lwjglNatives = 'natives-windows' + (arch.contains('64') ? '64' : '')
+}
+
+dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+
+    implementation "org.lwjgl:lwjgl"
+    implementation "org.lwjgl:lwjgl-glfw"
+    implementation "org.lwjgl:lwjgl-opengl"
+    implementation "org.lwjgl:lwjgl-stb"
+
+    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
+
+    implementation files('algs4.jar')
+}
+
+application {
+    mainClass = 'IntelligentScissorsLWJGL'
+    
+    // 只在 macOS 上添加 -XstartOnFirstThread
+    if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+        applicationDefaultJvmArgs = [
+            "-XstartOnFirstThread"
+        ]
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
