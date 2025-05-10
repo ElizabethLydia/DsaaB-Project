@@ -42,7 +42,7 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
 
-    implementation files('algs4.jar')
+    implementation files('lib/algs4.jar')
 }
 
 application {
