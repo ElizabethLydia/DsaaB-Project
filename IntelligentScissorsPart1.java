@@ -53,6 +53,17 @@ class KDTree {
     private KDNode root;
     private int size;
 
+    private int nodesVisited; // 评估：记录节点访问次数
+
+    public void resetNodesVisited() {
+        nodesVisited = 0;
+    }
+
+    // 获取节点访问次数
+    public int getNodesVisited() {
+        return nodesVisited;
+    }
+
     public void insert(int x, int y, double gradient) {
         root = insert(root, x, y, gradient, 0);
         size++;
@@ -79,6 +90,8 @@ class KDTree {
 
     private void rangeSearch(KDNode node, int cx, int cy, double half, PriorityQueue<KDNode> pq, int depth) {
         if (node == null) return;
+        nodesVisited++; // 每次访问节点时递增
+
         double dx = node.x - cx;
         double dy = node.y - cy;
         if (Math.abs(dx) <= half && Math.abs(dy) <= half) {
@@ -114,20 +127,6 @@ public class IntelligentScissorsPart1 {
 
     public IntelligentScissorsPart1(String imagePath) throws IOException {
         this.image = ImageIO.read(new File(imagePath));
-        this.width = image.getWidth();
-        this.height = image.getHeight();
-        this.pixels = new int[height][width];
-        this.Ix = new float[height][width];
-        this.Iy = new float[height][width];
-        this.G = new float[height][width];
-        this.f_G = new float[height][width];
-        this.graph = new Node[height][width];
-        this.kdTree = new KDTree();
-        loadPixels();
-    }
-
-    public IntelligentScissorsPart1(BufferedImage image) {
-        this.image = image;
         this.width = image.getWidth();
         this.height = image.getHeight();
         this.pixels = new int[height][width];
@@ -307,7 +306,7 @@ public class IntelligentScissorsPart1 {
         }
     }
 
-    private void computeGradientMagnitude() {
+    private void computeGradientMagnitude(double thresholdFraction) {
         double[] localMaxG = new double[NUM_THREADS];
         ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
         int chunkSize = height / NUM_THREADS;
@@ -339,13 +338,37 @@ public class IntelligentScissorsPart1 {
         double G_max = Arrays.stream(localMaxG).filter(max -> max >= 0).max().orElse(0);
 
         // Build KD-tree for high-gradient pixels
-        double threshold = G_max * 0.1; // Top 10% gradients
+        double threshold = G_max * thresholdFraction;
+        int nodeCount = 0; // 记录插入的节点数
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (G[y][x] > threshold) {
                     kdTree.insert(x, y, G[y][x]);
+                    nodeCount++;
                 }
             }
+        }
+        System.out.println("KDTree nodes inserted: " + nodeCount + " (threshold: " + thresholdFraction + ")");
+
+        executor = Executors.newFixedThreadPool(NUM_THREADS);
+        for (int t = 0; t < NUM_THREADS; t++) {
+            final int startY = t * chunkSize;
+            final int endY = (t == NUM_THREADS - 1) ? height : (t + 1) * chunkSize;
+
+            executor.execute(() -> {
+                for (int y = startY; y < endY; y++) {
+                    for (int x = 0; x < width; x++) {
+                        f_G[y][x] = G_max == 0 ? 0 : (float) ((G_max - G[y][x]) / G_max);
+                    }
+                }
+            });
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         executor = Executors.newFixedThreadPool(NUM_THREADS);
@@ -494,18 +517,23 @@ public class IntelligentScissorsPart1 {
         return result;
     }
 
+
+    // 优化版本（使用 KD 树）
     public int[] findStrongestEdgeInNeighborhood(int x, int y, int windowSize) {
         if (G == null) {
-            throw new IllegalStateException("Gradient not computed. Call computeGradients() first.");
+            throw new IllegalStateException("梯度未计算，请先调用 computeGradients()");
         }
 
-        // Try KD-tree first
         KDNode strongest = kdTree.findStrongestInRange(x, y, windowSize);
         if (strongest != null) {
             return new int[] { strongest.x, strongest.y };
         }
 
-        // Fallback to brute-force search
+        return findStrongestEdgeBruteForce(x, y, windowSize);
+    }
+
+    // 未优化版本（暴力搜索）
+    private int[] findStrongestEdgeBruteForce(int x, int y, int windowSize) {
         int half = windowSize / 2;
         int bestX = x;
         int bestY = y;
@@ -529,6 +557,66 @@ public class IntelligentScissorsPart1 {
         return new int[] { bestX, bestY };
     }
 
+    public void evaluatePerformance(String outputDir) throws IOException {
+        File dir = new File(outputDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+
+        try (PrintWriter writer = new PrintWriter(new File(outputDir + "/performance.csv"))) {
+            writer.println("x,y,windowSize,threshold,method,time_ns,memory_bytes,nodes_visited,result_x,result_y");
+
+            double[] thresholds = {0.05, 0.1, 0.2}; // 测试不同高梯度点阈值
+            int[] windowSizes = {5, 10, 20, 50, 100}; // 测试不同窗口大小
+            int numTrials = 10;
+            int[] testPoints = {
+                    width / 4, height / 4,
+                    width / 2, height / 2,
+                    3 * width / 4, 3 * height / 4
+            };
+
+            Runtime runtime = Runtime.getRuntime();
+
+            for (double threshold : thresholds) {
+                // 为每个阈值重新处理图像
+                kdTree = new KDTree(); // 重置 KD 树
+                process(threshold);
+
+                for (int windowSize : windowSizes) {
+                    for (int i = 0; i < testPoints.length; i += 2) {
+                        int x = testPoints[i];
+                        int y = testPoints[i + 1];
+
+                        for (int trial = 0; trial < numTrials; trial++) {
+                            // KD 树
+                            runtime.gc();
+                            long startMemory = runtime.totalMemory() - runtime.freeMemory();
+                            kdTree.resetNodesVisited(); // 重置节点访问计数
+                            long startTime = System.nanoTime();
+                            int[] kdResult = findStrongestEdgeInNeighborhood(x, y, windowSize);
+                            long kdTime = System.nanoTime() - startTime;
+                            long kdMemory = (runtime.totalMemory() - runtime.freeMemory()) - startMemory;
+                            int kdNodesVisited = kdTree.getNodesVisited();
+
+                            // 暴力搜索
+                            runtime.gc();
+                            startMemory = runtime.totalMemory() - runtime.freeMemory();
+                            startTime = System.nanoTime();
+                            int[] bfResult = findStrongestEdgeBruteForce(x, y, windowSize);
+                            long bfTime = System.nanoTime() - startTime;
+                            long bfMemory = (runtime.totalMemory() - runtime.freeMemory()) - startMemory;
+                            int bfNodesVisited = windowSize * windowSize; // 暴力搜索检查的像素数
+
+                            writer.println(String.format("%d,%d,%d,%.2f,KDTree,%d,%d,%d,%d,%d",
+                                    x, y, windowSize, threshold, kdTime, kdMemory, kdNodesVisited, kdResult[0], kdResult[1]));
+                            writer.println(String.format("%d,%d,%d,%.2f,BruteForce,%d,%d,%d,%d,%d",
+                                    x, y, windowSize, threshold, bfTime, bfMemory, bfNodesVisited, bfResult[0], bfResult[1]));
+                        }
+                    }
+                }
+            }
+        }
+    }
     private void saveToCSV(String outputDir) throws IOException {
         File dir = new File(outputDir);
         if (!dir.exists()) {
@@ -561,13 +649,17 @@ public class IntelligentScissorsPart1 {
         return result;
     }
 
-    public void process() throws IOException {
+
+    public void process(double thresholdFraction) throws IOException {  //用于评估
         applyGaussianBlur();
         computeGradients();
         edgeEnhancement();
-        computeGradientMagnitude();
+        computeGradientMagnitude(thresholdFraction);
         buildGraph();
         saveToCSV("output");
+    }
+    public void process() throws IOException {
+        process(0.1); // 使用默认阈值 0.1，与原始代码一致
     }
 
     public Node[][] getGraph() {
@@ -617,25 +709,14 @@ public class IntelligentScissorsPart1 {
         }
         return grayImage;
     }
-
     public static void main(String[] args) {
         try {
             IntelligentScissorsPart1 processor = new IntelligentScissorsPart1("sample.png");
-            processor.process();
-            int seedX = 10, seedY = 10;
-            int targetX = 20, targetY = 20;
-            List<Node> path = processor.computeShortestPath(seedX, seedY, targetX, targetY);
-            System.out.println("Shortest Path from (" + seedX + ", " + seedY + ") to (" + targetX + ", " + targetY + "):");
-            if (path.isEmpty()) {
-                System.out.println("No path found!");
-            } else {
-                for (Node node : path) {
-                    System.out.println("(" + node.x + ", " + node.y + ")");
-                }
-                System.out.println("Path length: " + path.size() + " nodes");
-            }
+            processor.evaluatePerformance("output");
+            System.out.println("Performance evaluation completed, results saved to “output/performance.csv");
         } catch (IOException e) {
             System.err.println("Error: " + e.getMessage());
         }
     }
+
 }

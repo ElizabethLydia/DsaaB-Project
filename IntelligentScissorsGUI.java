@@ -11,7 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Arrays;
+
 
 public class IntelligentScissorsGUI extends JFrame {
     private IntelligentScissorsPart1 processor;
@@ -40,9 +40,6 @@ public class IntelligentScissorsGUI extends JFrame {
         seedNodes = new ArrayList<>();
         paths = new ArrayList<>();
         setAlwaysOnTop(true);
-//        // 移除 setAlwaysOnTop(true)，改为初始置前
-//        toFront();
-//        requestFocus();
 
         // 图像显示区域
         imageLabel = new JLabel() {
@@ -150,21 +147,6 @@ public class IntelligentScissorsGUI extends JFrame {
             updateImageDisplay();
         });
         toolbar.add(originalSizeButton);
-//        JButton closePathButton = new JButton("Close Path");
-//        closePathButton.addActionListener(e -> {
-//            if (processor != null && seedNodes.size() >= 2) {
-//                // 连接首尾种子点
-//                Node first = seedNodes.get(0);
-//                Node last = seedNodes.get(seedNodes.size() - 1);
-//                List<Node> closingPath = processor.computeShortestPath(last.x, last.y, first.x, first.y);
-//                if (!closingPath.isEmpty()) {
-//                    paths.add(closingPath);
-//                    imageLabel.repaint();
-//                }
-//            }
-//        });
-//        toolbar.add(closePathButton);
-
 
         JButton saveButton = new JButton("Save Path");
         saveButton.addActionListener(e -> {
@@ -330,11 +312,9 @@ public class IntelligentScissorsGUI extends JFrame {
             @Override
             public void mouseMoved(MouseEvent e) {
                 if (processor != null && originalImage != null && !seedNodes.isEmpty() && isDragging) {
-                    // 获取鼠标坐标并转换为原始图像坐标
                     int x = (int) (e.getX() / scaleX);
                     int y = (int) (e.getY() / scaleY);
 
-                    // 边界检查
                     if (x < 0 || x >= originalImage.getWidth() || y < 0 || y >= originalImage.getHeight()) {
                         return;
                     }
@@ -350,17 +330,15 @@ public class IntelligentScissorsGUI extends JFrame {
                     Node lastSeed = seedNodes.get(seedNodes.size() - 1);
                     List<Node> tempPath = processor.computeShortestPath(lastSeed.x, lastSeed.y, x, y);
 
-                    // 临时替换最后一个路径（不保存）
                     List<List<Node>> tempPaths = new ArrayList<>(paths);
                     if (!tempPaths.isEmpty()) {
                         tempPaths.remove(tempPaths.size() - 1);
                     }
                     tempPaths.add(tempPath);
 
-                    // 绘制临时路径
+                    // 绘制
                     imageLabel.repaint();
 
-                    // 恢复 paths，避免影响保存
                     paths.clear();
                     paths.addAll(tempPaths.subList(0, tempPaths.size() - 1));
                     if (!tempPath.isEmpty()) {
